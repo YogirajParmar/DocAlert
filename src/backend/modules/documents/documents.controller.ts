@@ -312,4 +312,151 @@ export class DocumentController {
       return res.status(500).json({ error: error.message });
     }
   };
+
+  public importPUCDocuments = async (req: TRequest, res: TResponse) => {
+    try {
+      const userId = req.me.id;
+      const { csvContent } = req.body as { csvContent: string };
+
+      if (!csvContent || typeof csvContent !== 'string' || !csvContent.trim()) {
+        return res.status(400).json({ error: 'csvContent is required in the request body.' });
+      }
+
+      // ── CSV Parser ──────────────────────────────────────────────────────────
+      // RFC-4180 compliant: handles quoted fields with embedded commas/newlines.
+      const parseCSV = (raw: string): string[][] => {
+        const rows: string[][] = [];
+        let row: string[] = [];
+        let field = '';
+        let inQuotes = false;
+
+        for (let i = 0; i < raw.length; i++) {
+          const ch = raw[i];
+          const next = raw[i + 1];
+
+          if (inQuotes) {
+            if (ch === '"' && next === '"') { field += '"'; i++; }
+            else if (ch === '"') { inQuotes = false; }
+            else { field += ch; }
+          } else {
+            if (ch === '"') { inQuotes = true; }
+            else if (ch === ',') { row.push(field.trim()); field = ''; }
+            else if (ch === '\n' || (ch === '\r' && next === '\n')) {
+              if (ch === '\r') i++;
+              row.push(field.trim());
+              if (row.some((c) => c !== '')) rows.push(row);
+              row = []; field = '';
+            } else { field += ch; }
+          }
+        }
+        // last field / row
+        row.push(field.trim());
+        if (row.some((c) => c !== '')) rows.push(row);
+
+        return rows;
+      };
+
+      const rows = parseCSV(csvContent);
+      if (rows.length < 2) {
+        return res.status(400).json({ error: 'CSV file must contain a header row and at least one data row.' });
+      }
+
+      const headers = rows[0].map((h) => h.toLowerCase());
+
+      // ── Column presence validation ───────────────────────────────────────────
+      // All columns that match the PUC model (id excluded on import since it is auto-generated)
+      const REQUIRED_HEADERS = [
+        'vehiclenumber',
+        'vehicletype',
+        'issuedate',
+        'expirationdate',
+        'documenttype',
+        'userid',
+        'deleted',
+        'deletedat',
+        'createdat',
+        'updatedat',
+      ];
+
+      const missingHeaders = REQUIRED_HEADERS.filter((h) => !headers.includes(h));
+      if (missingHeaders.length > 0) {
+        return res.status(400).json({
+          error: `CSV is missing required columns: ${missingHeaders.join(', ')}. Please use the exported file as a template.`,
+        });
+      }
+
+      const idx = (name: string) => headers.indexOf(name.toLowerCase());
+
+      // ── Row-level validation & mapping ───────────────────────────────────────
+      const MANDATORY_FIELDS: Array<{ col: string; label: string }> = [
+        { col: 'vehiclenumber', label: 'vehicleNumber' },
+        { col: 'vehicletype',   label: 'vehicleType'   },
+        { col: 'issuedate',     label: 'issueDate'     },
+        { col: 'expirationdate',label: 'expirationDate'},
+      ];
+
+      const dataRows = rows.slice(1);
+      const validRecords: Array<Partial<InstanceType<typeof PUC>>> = [];
+      const errors: Array<{ row: number; issues: string[] }> = [];
+
+      for (let r = 0; r < dataRows.length; r++) {
+        const cells = dataRows[r];
+        const rowNum = r + 2; // 1-based, +1 for header
+        const issues: string[] = [];
+
+        // Check mandatory fields are non-empty
+        for (const { col, label } of MANDATORY_FIELDS) {
+          const val = cells[idx(col)] ?? '';
+          if (!val.trim()) issues.push(`${label} is required`);
+        }
+
+        // Validate dates
+        const issueDateRaw      = cells[idx('issuedate')]      ?? '';
+        const expirationDateRaw = cells[idx('expirationdate')] ?? '';
+        const issueDate      = issueDateRaw      ? new Date(issueDateRaw)      : null;
+        const expirationDate = expirationDateRaw ? new Date(expirationDateRaw) : null;
+
+        if (issueDateRaw && isNaN(issueDate?.getTime())) {
+          issues.push(`issueDate "${issueDateRaw}" is not a valid date`);
+        }
+        if (expirationDateRaw && isNaN(expirationDate?.getTime())) {
+          issues.push(`expirationDate "${expirationDateRaw}" is not a valid date`);
+        }
+
+        if (issues.length > 0) {
+          errors.push({ row: rowNum, issues });
+          continue;
+        }
+
+        validRecords.push({
+          vehicleNumber:  cells[idx('vehiclenumber')].trim(),
+          vehicleType:    cells[idx('vehicletype')].trim(),
+          documentType:   cells[idx('documenttype')]?.trim() || null,
+          issueDate,
+          expirationDate,
+          userId,          // always use the authenticated user — ignore CSV userId
+          deleted:        false,
+        });
+      }
+
+      // ── Bulk insert ──────────────────────────────────────────────────────────
+      let inserted = 0;
+      if (validRecords.length > 0) {
+        await PUC.bulkCreate(validRecords as Parameters<typeof PUC.bulkCreate>[0]);
+        inserted = validRecords.length;
+      }
+
+      this.logger.log('info', `Import: ${inserted} inserted, ${errors.length} failed for user ${userId}`);
+
+      return res.status(200).json({
+        message: `Import complete. ${inserted} record(s) imported, ${errors.length} skipped.`,
+        inserted,
+        skipped: errors.length,
+        errors,   // per-row details returned so the UI can surface them
+      });
+    } catch (error) {
+      this.logger.log('error', error.message);
+      return res.status(500).json({ error: error.message });
+    }
+  };
 }

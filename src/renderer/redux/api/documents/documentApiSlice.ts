@@ -79,6 +79,20 @@ export const documentApiSlice = apiSlice.injectEndpoints({
         };
       },
     }),
+
+    /**
+     * Import PUC documents from CSV text.
+     * Body: { csvContent: string }
+     * Returns: { message, inserted, skipped, errors[] }
+     */
+    importPUCDocuments: builder.mutation({
+      query: (csvContent: string) => ({
+        url: '/docs/puc/import',
+        method: 'POST',
+        body: { csvContent },
+      }),
+      invalidatesTags: ['documents', 'stats'],
+    }),
   }),
 });
 
@@ -89,4 +103,5 @@ export const {
   useDeleteDocumentMutation,
   useGetStatsQuery,
   useLazyExportPUCDocumentsQuery,
+  useImportPUCDocumentsMutation,
 } = documentApiSlice;

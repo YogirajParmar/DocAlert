@@ -1,5 +1,5 @@
-import React, { useState, useRef } from 'react';
-import { useLazyExportPUCDocumentsQuery } from '../../redux/api/documents/documentApiSlice';
+import React, { useState, useRef, useEffect } from 'react';
+import { useLazyExportPUCDocumentsQuery, useImportPUCDocumentsMutation } from '../../redux/api/documents/documentApiSlice';
 import toast from 'react-hot-toast';
 
 // ─── tiny helpers ────────────────────────────────────────────────────────────
@@ -22,8 +22,13 @@ const Field = ({ label, id, type = 'text', placeholder, value, onChange }) => (
 
 // ─── component ───────────────────────────────────────────────────────────────
 
-export const ExportImportModal = ({ isOpen, onClose }) => {
-  const [activeTab, setActiveTab] = useState('export'); // 'export' | 'import'
+export const ExportImportModal = ({ isOpen, onClose, initialTab = 'export' }) => {
+  const [activeTab, setActiveTab] = useState(initialTab);
+
+  // Reset to the requested tab every time the modal opens
+  useEffect(() => {
+    if (isOpen) setActiveTab(initialTab);
+  }, [isOpen, initialTab]);
 
   // --- export state ---
   const [filters, setFilters] = useState({
@@ -42,6 +47,9 @@ export const ExportImportModal = ({ isOpen, onClose }) => {
   const fileInputRef = useRef(null);
   const [importFile, setImportFile] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [importResult, setImportResult] = useState(null); // { inserted, skipped, errors, message }
+  const [importPUCDocuments] = useImportPUCDocumentsMutation();
 
   const setFilter = (key) => (val) => setFilters((prev) => ({ ...prev, [key]: val }));
 
@@ -91,8 +99,37 @@ export const ExportImportModal = ({ isOpen, onClose }) => {
     e.preventDefault();
     setIsDragging(false);
     const file = e.dataTransfer?.files?.[0];
-    if (file && file.name.endsWith('.csv')) setImportFile(file);
+    if (file && file.name.endsWith('.csv')) { setImportFile(file); setImportResult(null); }
     else toast.error('Please upload a valid .csv file');
+  };
+
+  const handleImport = async () => {
+    if (!importFile) return;
+    setImporting(true);
+    setImportResult(null);
+    try {
+      const csvContent = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (e) => resolve(e.target.result);
+        reader.onerror = () => reject(new Error('Failed to read file'));
+        reader.readAsText(importFile);
+      });
+
+      const result = await importPUCDocuments(csvContent).unwrap();
+      setImportResult(result);
+
+      if (result.inserted > 0) {
+        toast.success(`${result.inserted} record(s) imported successfully!`);
+      }
+      if (result.skipped > 0) {
+        toast.error(`${result.skipped} row(s) were skipped due to validation errors.`);
+      }
+    } catch (err) {
+      const msg = err?.data?.error || 'Import failed. Please check your file and try again.';
+      toast.error(msg);
+    } finally {
+      setImporting(false);
+    }
   };
 
   if (!isOpen) return null;
@@ -112,10 +149,10 @@ export const ExportImportModal = ({ isOpen, onClose }) => {
               className={`eim-tab ${activeTab === 'export' ? 'eim-tab--active' : ''}`}
               onClick={() => setActiveTab('export')}
             >
-              <svg width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2'>
+               <svg width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2'>
                 <path d='M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4' />
-                <polyline points='7 10 12 15 17 10' />
-                <line x1='12' y1='15' x2='12' y2='3' />
+                <polyline points='17 8 12 3 7 8' />
+                <line x1='12' y1='3' x2='12' y2='15' />
               </svg>
               Export
             </button>
@@ -126,9 +163,10 @@ export const ExportImportModal = ({ isOpen, onClose }) => {
             >
               <svg width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2'>
                 <path d='M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4' />
-                <polyline points='17 8 12 3 7 8' />
-                <line x1='12' y1='3' x2='12' y2='15' />
+                <polyline points='7 10 12 15 17 10' />
+                <line x1='12' y1='15' x2='12' y2='3' />
               </svg>
+
               Import
             </button>
           </div>
@@ -351,22 +389,64 @@ export const ExportImportModal = ({ isOpen, onClose }) => {
               Need the right format? Export your existing data first to use as a template.
             </div>
 
+            {/* ── Import result summary ── */}
+            {importResult && (
+              <div className={`eim-result-panel ${importResult.skipped > 0 && importResult.inserted === 0 ? 'eim-result-panel--error' : importResult.skipped > 0 ? 'eim-result-panel--warn' : 'eim-result-panel--success'}`}>
+                <div className='eim-result-summary'>
+                  <span className='eim-result-stat eim-result-stat--green'>
+                    <svg width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2.5'><polyline points='20 6 9 17 4 12'/></svg>
+                    {importResult.inserted} imported
+                  </span>
+                  {importResult.skipped > 0 && (
+                    <span className='eim-result-stat eim-result-stat--red'>
+                      <svg width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2.5'><line x1='18' y1='6' x2='6' y2='18'/><line x1='6' y1='6' x2='18' y2='18'/></svg>
+                      {importResult.skipped} skipped
+                    </span>
+                  )}
+                </div>
+                {importResult.errors?.length > 0 && (
+                  <div className='eim-result-errors'>
+                    {importResult.errors.slice(0, 6).map((e, i) => (
+                      <div key={i} className='eim-result-error-row'>
+                        <span className='eim-result-row-num'>Row {e.row}</span>
+                        <span>{e.issues.join(' · ')}</span>
+                      </div>
+                    ))}
+                    {importResult.errors.length > 6 && (
+                      <div className='eim-result-error-row eim-result-more'>+{importResult.errors.length - 6} more rows with errors</div>
+                    )}
+                  </div>
+                )}
+                {importResult.inserted > 0 && (
+                  <button className='eim-result-done-btn' onClick={() => { setImportResult(null); setImportFile(null); if (fileInputRef.current) fileInputRef.current.value = ''; onClose(); }}>
+                    Done
+                  </button>
+                )}
+              </div>
+            )}
+
             <div className='eim-footer'>
-              <p className='eim-footer-hint eim-coming-soon-badge'>
-                🚧 Import feature coming soon
+              <p className='eim-footer-hint'>
+                The CSV must include all PUC columns — export your data first to use as a template.
               </p>
               <button
                 id='import-submit-btn'
                 className='eim-primary-btn'
-                disabled={!importFile}
-                onClick={() => toast('Import coming soon! 🚧', { icon: '🔧' })}
+                disabled={!importFile || importing}
+                onClick={handleImport}
               >
-                <svg width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2'>
-                  <path d='M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4' />
-                  <polyline points='17 8 12 3 7 8' />
-                  <line x1='12' y1='3' x2='12' y2='15' />
-                </svg>
-                Import Documents
+                {importing ? (
+                  <><span className='eim-spinner' />Importing…</>
+                ) : (
+                  <>
+                    <svg width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2'>
+                      <path d='M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4' />
+                      <polyline points='17 8 12 3 7 8' />
+                      <line x1='12' y1='3' x2='12' y2='15' />
+                    </svg>
+                    Import Documents
+                  </>
+                )}
               </button>
             </div>
           </div>
@@ -564,6 +644,43 @@ export const ExportImportModal = ({ isOpen, onClose }) => {
           background: #f9fafb; border: 1px solid #e5e7eb;
           border-radius: 9px; padding: 10px 14px;
         }
+
+        /* ── Import result panel ── */
+        .eim-result-panel {
+          border-radius: 12px; border: 1px solid #e5e7eb;
+          padding: 14px 16px; display: flex; flex-direction: column; gap: 10px;
+          animation: eim-fade-in 0.2s ease;
+        }
+        .eim-result-panel--success { background: #f0fdf4; border-color: #bbf7d0; }
+        .eim-result-panel--warn    { background: #fffbeb; border-color: #fde68a; }
+        .eim-result-panel--error   { background: #fef2f2; border-color: #fecaca; }
+        .eim-result-summary { display: flex; gap: 16px; align-items: center; }
+        .eim-result-stat {
+          display: inline-flex; align-items: center; gap: 5px;
+          font-size: 0.85rem; font-weight: 600;
+        }
+        .eim-result-stat--green { color: #16a34a; }
+        .eim-result-stat--red   { color: #dc2626; }
+        .eim-result-errors {
+          display: flex; flex-direction: column; gap: 4px;
+          max-height: 130px; overflow-y: auto;
+        }
+        .eim-result-error-row {
+          display: flex; gap: 8px; align-items: baseline;
+          font-size: 0.78rem; color: #374151;
+          background: rgba(255,255,255,0.6); border-radius: 6px; padding: 4px 8px;
+        }
+        .eim-result-row-num {
+          font-weight: 700; color: #dc2626; white-space: nowrap; flex-shrink: 0;
+        }
+        .eim-result-more { color: #6b7280; font-style: italic; }
+        .eim-result-done-btn {
+          align-self: flex-start; font-size: 0.8rem; padding: 5px 14px;
+          border: 1px solid #16a34a; border-radius: 8px;
+          background: #fff; color: #16a34a; cursor: pointer; font-weight: 600;
+          transition: all 0.15s;
+        }
+        .eim-result-done-btn:hover { background: #f0fdf4; }
 
         /* ── Animations ── */
         @keyframes eim-fade-in { from { opacity: 0; } to { opacity: 1; } }
