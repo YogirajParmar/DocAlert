@@ -2,9 +2,10 @@ import { TRequest, TResponse } from '../../types';
 import { PUC, User } from '../../entities';
 import { CreatePUCDto } from './dto';
 import { Op } from 'sequelize';
-import { logger } from '../../helpers';
+import { Logger } from '../../helpers';
 
 export class DocumentController {
+  private logger = Logger.getInstance('DocumentController');
   constructor() {}
 
   public addDocument = async (req: TRequest<CreatePUCDto>, res: TResponse) => {
@@ -213,6 +214,102 @@ export class DocumentController {
     } catch (err) {
       console.error('Error searching documents:', err);
       res.status(500).json({ message: 'Something went wrong' });
+    }
+  };
+
+  public exportPUCDocuments = async (req: TRequest, res: TResponse) => {
+    try {
+      const userId = req.me.id;
+      const {
+        vehicleNumber,
+        vehicleType,
+        documentType,
+        issueDateFrom,
+        issueDateTo,
+        expirationDateFrom,
+        expirationDateTo,
+      } = req.query as Record<string, string | undefined>;
+
+      // Build dynamic where clause
+      const where: Record<string, unknown> = { userId, deleted: false };
+
+      if (vehicleNumber) {
+        where.vehicleNumber = { [Op.like]: `%${vehicleNumber}%` };
+      }
+
+      if (vehicleType) {
+        where.vehicleType = { [Op.like]: `%${vehicleType}%` };
+      }
+
+      if (documentType) {
+        where.documentType = { [Op.like]: `%${documentType}%` };
+      }
+
+      // issueDate range filter
+      if (issueDateFrom || issueDateTo) {
+        const issueDateFilter: Record<symbol, Date> = {};
+        if (issueDateFrom) issueDateFilter[Op.gte] = new Date(issueDateFrom);
+        if (issueDateTo) issueDateFilter[Op.lte] = new Date(issueDateTo);
+        where.issueDate = issueDateFilter;
+      }
+
+      // expirationDate range filter
+      if (expirationDateFrom || expirationDateTo) {
+        const expirationDateFilter: Record<symbol, Date> = {};
+        if (expirationDateFrom) expirationDateFilter[Op.gte] = new Date(expirationDateFrom);
+        if (expirationDateTo) expirationDateFilter[Op.lte] = new Date(expirationDateTo);
+        where.expirationDate = expirationDateFilter;
+      }
+
+      const documents = await PUC.findAll({
+        where,
+        order: [['createdAt', 'DESC']],
+      });
+
+      // CSV column order — id excluded, userId included
+      const CSV_HEADERS = [
+        'userId',
+        'vehicleNumber',
+        'vehicleType',
+        'documentType',
+        'issueDate',
+        'expirationDate',
+        'deleted',
+        'deletedAt',
+        'createdAt',
+        'updatedAt',
+      ] as const;
+
+      type CsvHeader = (typeof CSV_HEADERS)[number];
+
+      const escapeCSV = (value: unknown): string => {
+        if (value === null || value === undefined) return '';
+        const str = String(value instanceof Date ? value.toISOString() : value);
+        if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+          return `"${str.replace(/"/g, '""')}"`;
+        }
+        return str;
+      };
+
+      const rows = documents.map((doc) =>
+        CSV_HEADERS.map((header) =>
+          escapeCSV((doc as unknown as Record<CsvHeader, unknown>)[header])
+        ).join(',')
+      );
+
+      const csvContent = [CSV_HEADERS.join(','), ...rows].join('\n');
+
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename="puc_export_${Date.now()}.csv"`
+      );
+
+      this.logger.log('info', `Exported ${documents.length} PUC records for user ${userId}`);
+      return res.status(200).send(csvContent);
+    } catch (error) {
+      this.logger.log('error', error.message);
+      return res.status(500).json({ error: error.message });
     }
   };
 }

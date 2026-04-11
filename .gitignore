@@ -11,3 +11,4 @@ liquibase/*.properties
 database.sqlite
 /out
 /src/.dev-db
+.DS_Store
