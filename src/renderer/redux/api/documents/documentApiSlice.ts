@@ -59,6 +59,40 @@ export const documentApiSlice = apiSlice.injectEndpoints({
       }),
       providesTags: ['stats'],
     }),
+
+    /**
+     * Export PUC documents as CSV with optional filters.
+     * Filters: vehicleNumber, vehicleType, documentType,
+     *          issueDateFrom, issueDateTo, expirationDateFrom, expirationDateTo
+     */
+    exportPUCDocuments: builder.query({
+      query: (filters: Record<string, string> = {}) => {
+        const params = new URLSearchParams();
+        Object.entries(filters).forEach(([key, value]) => {
+          if (value) params.set(key, value);
+        });
+        const qs = params.toString();
+        return {
+          url: `/docs/puc/export${qs ? `?${qs}` : ''}`,
+          method: 'GET',
+          responseHandler: (response) => response.blob(),
+        };
+      },
+    }),
+
+    /**
+     * Import PUC documents from CSV text.
+     * Body: { csvContent: string }
+     * Returns: { message, inserted, skipped, errors[] }
+     */
+    importPUCDocuments: builder.mutation({
+      query: (csvContent: string) => ({
+        url: '/docs/puc/import',
+        method: 'POST',
+        body: { csvContent },
+      }),
+      invalidatesTags: ['documents', 'stats'],
+    }),
   }),
 });
 
@@ -68,4 +102,6 @@ export const {
   useUpdateDocumentMutation,
   useDeleteDocumentMutation,
   useGetStatsQuery,
+  useLazyExportPUCDocumentsQuery,
+  useImportPUCDocumentsMutation,
 } = documentApiSlice;

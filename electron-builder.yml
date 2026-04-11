@@ -1,30 +1,40 @@
 appId: com.yogiraj.docalert
 productName: DocAlert
 
+# Directory settings
 directories:
   buildResources: assets
 
+# Files to be included in the build
 files:
   - dist/**
+  - "!dist/**/*.map"
+  - node_modules/**/*
+  - package.json
 
+# Extra resources to be included
 extraResources:
   - from: .env
     to: .env
 
+# ASAR settings
 asar: true
+# Unpack files from ASAR
 asarUnpack:
-  - "**/*.node"
-  
+  - node_modules/sqlite3/**/*
+
 publish:
   - provider: github
     owner: YogirajParmar
     repo: notifyer-mono-repo
 
+# Windows build configuration
 win:
   target:
     - nsis
   icon: public/icon/android-chrome-512x512.png
 
+# NSIS installer configuration
 nsis:
   oneClick: false
   allowToChangeInstallationDirectory: true

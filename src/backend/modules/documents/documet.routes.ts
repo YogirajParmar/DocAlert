@@ -40,6 +40,16 @@ export class DocumentRouter extends TRouter {
       this.documentController.updateDocument
     );
     this.router.get(
+      "/puc/export",
+      this.authMiddleware.auth,
+      this.documentController.exportPUCDocuments
+    );
+    this.router.post(
+      "/puc/import",
+      this.authMiddleware.auth,
+      this.documentController.importPUCDocuments
+    );
+    this.router.get(
       "/puc/:id",
       this.authMiddleware.auth,
       this.documentController.getDocument

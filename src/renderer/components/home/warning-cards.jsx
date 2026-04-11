@@ -4,7 +4,7 @@ import { formatDate } from './table';
 export const WarningCards = ({ documents }) => {
   return (
     <div className='p-4'>
-      <h2 className='text-lg font-semibold mb-3'>Expiring Soon</h2>
+      <h2 className='text-lg font-semibold mb-3'>Expiring within next 30 days</h2>
 
       <div className='flex space-x-4 overflow-x-auto pb-2'>
         {documents.length > 0 ? (

@@ -418,15 +418,21 @@ export const TableWithPagination = ({ data, rowsPerPage = 10 }) => {
                 </th>
                 <th
                   className='px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider cursor-pointer'
-                  onClick={() => handleSort('vehicleNumber')}
+                  onClick={() => handleSort('documentType')}
                 >
-                  Vehicle No.{renderSortIndicator('vehicleNumber')}
+                  Document Type{renderSortIndicator('documentType')}
                 </th>
                 <th
                   className='px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider cursor-pointer'
                   onClick={() => handleSort('vehicleType')}
                 >
                   Vehicle Type{renderSortIndicator('vehicleType')}
+                </th>
+                <th
+                  className='px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider cursor-pointer'
+                  onClick={() => handleSort('vehicleNumber')}
+                >
+                  Vehicle No.{renderSortIndicator('vehicleNumber')}
                 </th>
                 <th
                   className='px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider cursor-pointer'
@@ -439,12 +445,6 @@ export const TableWithPagination = ({ data, rowsPerPage = 10 }) => {
                   onClick={() => handleSort('expirationDate')}
                 >
                   Expiry Date{renderSortIndicator('expirationDate')}
-                </th>
-                <th
-                  className='px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider cursor-pointer'
-                  onClick={() => handleSort('documentType')}
-                >
-                  Document Type{renderSortIndicator('documentType')}
                 </th>
                 <th
                   className='px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider cursor-pointer'
@@ -475,25 +475,25 @@ export const TableWithPagination = ({ data, rowsPerPage = 10 }) => {
                       </div>
                     </td>
                     <td className='px-6 py-4 whitespace-nowrap'>
-                      <div className='text-sm font-medium text-gray-900'>
-                        {doc.vehicleNumber}
-                      </div>
+                      <span className='px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-600'>
+                        {doc.documentType}
+                      </span>
                     </td>
                     <td className='px-6 py-4 whitespace-nowrap'>
                       <span className='px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-600'>
                         {doc.vehicleType}
                       </span>
                     </td>
+                    <td className='px-6 py-4 whitespace-nowrap'>
+                      <div className='text-sm font-medium text-gray-900'>
+                        {doc.vehicleNumber}
+                      </div>
+                    </td>
                     <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-600'>
                       {formatDate(doc.issueDate)}
                     </td>
                     <td className='px-6 py-4 whitespace-nowrap text-sm text-gray-600'>
                       {formatDate(doc.expirationDate)}
-                    </td>
-                    <td className='px-6 py-4 whitespace-nowrap'>
-                      <span className='px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-600'>
-                        {doc.documentType}
-                      </span>
                     </td>
                     <td className='px-6 py-4 whitespace-nowrap'>
                       {isExpired ? (

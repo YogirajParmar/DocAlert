@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 
 import {
   useCreateDocumentMutation,
@@ -9,6 +10,7 @@ import { TableWithPagination } from './table';
 import { UploadForm } from './upload-form';
 import { WarningCards } from './warning-cards';
 import { Stats } from './stats';
+import { ExportImportModal } from './export-import-modal';
 import toast from 'react-hot-toast';
 import { useSelector } from 'react-redux';
 
@@ -34,6 +36,8 @@ export function HomePage() {
   const [createDocument] = useCreateDocumentMutation();
 
   const [isOpen, setIsOpen] = useState(false);
+  const [isExportImportOpen, setIsExportImportOpen] = useState(false);
+  const [exportImportTab, setExportImportTab] = useState('export');
 
   let userName = 'guest';
   const name = localStorage.getItem('userName');
@@ -68,14 +72,14 @@ export function HomePage() {
       <div>
         <nav className='bg-black text-white border-gray-200 dark:bg-gray-900 dark:border-gray-700 mb-5'>
           <div className='max-w-screen-xl mx-auto px-4 py-3 flex items-center justify-between'>
-            <a
-              href='#'
+            <Link
+              to='/home'
               className='flex items-center space-x-3 rtl:space-x-reverse'
             >
               <span className='self-center text-2xl font-semibold whitespace-nowrap dark:text-white'>
-                Doc Alert
+                DocAlert
               </span>
-            </a>
+            </Link>
 
             <div className='flex items-center space-x-4'>
               <p className='dark:text-gray-300'>Welcome back, {userName}</p>
@@ -98,7 +102,7 @@ export function HomePage() {
         </nav>
       </div>
 
-      <div className='p-4 bg-gray-50 font-sans'>
+      <div className='p-4 bg-gray-50 font-sans pb-20'>
         <div className='w-full max-w-7xl mx-auto'>
           {isStatsLoading && <p>Loading stats...</p>}
           {isStatsError &&
@@ -119,7 +123,7 @@ export function HomePage() {
           <WarningCards documents={expiringDocuments} />
         </div>
 
-        <div className='min-h-screen flex flex-col items-center'>
+        <div className='flex flex-col items-center'>
           {/* Document table with pagination */}
           <div className='bg-white p-6 rounded-xl shadow-lg w-full max-w-7xl'>
             {isLoading && (
@@ -135,6 +139,36 @@ export function HomePage() {
               <TableWithPagination data={data}></TableWithPagination>
             )}
           </div>
+
+          {/* ── Export / Import action bar ── */}
+          <div className='w-full max-w-7xl mt-3 flex justify-end gap-3'>
+            <button
+              id='open-export-btn'
+              onClick={() => { setExportImportTab('export'); setIsExportImportOpen(true); }}
+              className='inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gray-900 text-white text-sm font-semibold shadow hover:bg-black transition-all duration-150 hover:-translate-y-0.5'
+            >
+              <svg width='15' height='15' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2.2'>
+                <path d='M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4' />
+                <polyline points='17 8 12 3 7 8' />
+                <line x1='12' y1='3' x2='12' y2='15' />
+              </svg>
+
+              Export
+            </button>
+            <button
+              id='open-import-btn'
+              onClick={() => { setExportImportTab('import'); setIsExportImportOpen(true); }}
+              className='inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-white text-gray-800 text-sm font-semibold border border-gray-300 shadow-sm hover:bg-gray-50 transition-all duration-150 hover:-translate-y-0.5'
+            >
+              <svg width='15' height='15' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2.2'>
+                <path d='M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4' />
+                <polyline points='7 10 12 15 17 10' />
+                <line x1='12' y1='15' x2='12' y2='3' />
+              </svg>
+              Import
+            </button>
+          </div>
+
           {/* Floating Action Button */}
           <button
             onClick={() => setIsOpen(true)}
@@ -172,6 +206,13 @@ export function HomePage() {
           )}
         </div>
       </div>
+
+      {/* Export / Import Modal */}
+      <ExportImportModal
+        isOpen={isExportImportOpen}
+        initialTab={exportImportTab}
+        onClose={() => setIsExportImportOpen(false)}
+      />
     </div>
   );
 }
