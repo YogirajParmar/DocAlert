@@ -1,7 +1,5 @@
-!macro customHeader
-  !include "nsDialogs.nsh"
-  !include "LogicLib.nsh"
-!macroend
+!include "nsDialogs.nsh"
+!include "LogicLib.nsh"
 
 Var LicenseFilePath
 Var LicenseFileInput
