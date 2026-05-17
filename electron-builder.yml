@@ -41,5 +41,7 @@ nsis:
   createDesktopShortcut: true
   createStartMenuShortcut: true
   shortcutName: DocAlert
+  include: build/installer.nsh    # custom NSIS script hook
+  warningsAsErrors: false
 
 afterPack: ./after-pack.js

@@ -1,14 +1,16 @@
-import { app, BrowserWindow, dialog, ipcMain } from 'electron';
+import { app, BrowserWindow, ipcMain } from 'electron';
 import { autoUpdater } from 'electron-updater';
 import * as path from 'path';
 import Server from '../backend/serever';
 import { logger } from '../backend/helpers';
+import { LicenseService, licenseStatusChannel } from './license-service';
 
 export class Main {
   private mainWindow: BrowserWindow;
   private server: Server;
   private mainApp = app;
   private updater = autoUpdater;
+  private licenseService = new LicenseService();
 
   private indexPage: string;
   private isUpdateInProgress = false;
@@ -17,6 +19,7 @@ export class Main {
     this.indexPage = path.join(__dirname, '../index.html');
     this.server = new Server();
     this.checkForUpdates();
+    this.licenseService.setStatusListener(() => this.sendLicenseStatus());
     this.init();
   }
 
@@ -24,6 +27,7 @@ export class Main {
     // start the application
     this.mainApp.whenReady().then(async () => {
       await this.server.init();
+      await this.licenseService.initialize();
       this.registerIpcEvents();
       this.createWindow();
     });
@@ -52,6 +56,10 @@ export class Main {
       console.log('Loading production index.html from:', indexPath);
       this.mainWindow.loadFile(indexPath);
     }
+
+    this.mainWindow.webContents.on('did-finish-load', () => {
+      this.sendLicenseStatus();
+    });
   }
 
   private async checkForUpdates() {
@@ -123,6 +131,12 @@ export class Main {
     }
   }
 
+  private sendLicenseStatus() {
+    if (this.mainWindow && !this.mainWindow.isDestroyed()) {
+      this.mainWindow.webContents.send(licenseStatusChannel, this.licenseService.getStatus());
+    }
+  }
+
   private registerIpcEvents() {
     ipcMain.on('ping', (event, arg) => {
       logger.log('info', `Received ping: ${arg}`);
@@ -135,6 +149,34 @@ export class Main {
 
     ipcMain.handle('is-update-in-progress', () => {
       return this.isUpdateInProgress;
+    });
+
+    ipcMain.handle('license:get-status', async () => {
+      return this.licenseService.getStatus();
+    });
+
+    ipcMain.handle('license:activate-file', async () => {
+      return this.licenseService.activateFromFile();
+    });
+
+    ipcMain.handle('license:activate-manual', async (_event, licenseKey: string) => {
+      return this.licenseService.activateFromManualKey(licenseKey);
+    });
+
+    ipcMain.handle('license:retry-validation', async () => {
+      return this.licenseService.retryValidation();
+    });
+
+    ipcMain.handle('license:export-machine-request', async () => {
+      return this.licenseService.exportMachineRequestFile();
+    });
+
+    ipcMain.handle('license:open-purchase-page', async () => {
+      return this.licenseService.openPurchasePage();
+    });
+
+    ipcMain.handle('license:contact-support', async () => {
+      return this.licenseService.contactSupport();
     });
 
     ipcMain.on('login-failed', (event) => {
