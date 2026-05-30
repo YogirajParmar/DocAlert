@@ -45,15 +45,6 @@ export const up: Migration = async ({ context: sequelize }) => {
             type: DataTypes.INTEGER,
             allowNull: false,
           },
-          deleted: {
-            type: DataTypes.BOOLEAN,
-            allowNull: false,
-            defaultValue: false,
-          },
-          deletedAt: {
-            type: DataTypes.DATE,
-            allowNull: true,
-          },
         },
         { transaction },
       );
