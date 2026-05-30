@@ -1,6 +1,6 @@
 {
   "name": "docalert",
-  "version": "1.3.2",
+  "version": "1.3.3",
   "private": true,
   "main": "dist/electron/main.js",
   "description": "DocAlert is an application to manage Pollution Under Control (PUC) certificates and other vehicle documents.",
