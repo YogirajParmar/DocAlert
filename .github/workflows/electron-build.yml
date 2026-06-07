@@ -6,6 +6,8 @@ on:
       - main
       - develop
 
+  workflow_dispatch:
+
 jobs:
   windows_release:
     runs-on: windows-latest
