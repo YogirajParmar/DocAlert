@@ -23,6 +23,7 @@
     "pack": "electron-builder --dir",
     "dist": "electron-builder",
     "dist:win": "electron-builder build --win --x64 --publish never",
+    "release": "electron-builder --win --x64 --publish always",
     "postinstall": "electron-builder install-app-deps",
     "version": "git add package.json"
   },
