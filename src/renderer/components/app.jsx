@@ -5,6 +5,7 @@ import { HomePage } from './home/home';
 import { ResetPassword } from './auth/reset-password';
 import { Toaster } from 'react-hot-toast';
 import { UpdateModal } from './update-modal';
+import { AppVersion } from './app-version';
 import React from 'react';
 import { ActivationGate } from './license/activation-gate';
 
@@ -14,6 +15,7 @@ export const App = () => {
       <Router>
         <Toaster position='top-right' />
         <UpdateModal />
+        <AppVersion />
         <Routes>
           <Route path='/' element={<Login />} />
           <Route path='/signup' element={<SignUp />} />
